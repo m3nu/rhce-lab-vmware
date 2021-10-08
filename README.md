@@ -1,4 +1,4 @@
-# RHCE Vagrant Practice Lab (VMWare Fusion)
+# RHCE Vagrant Practice Lab (For VMWare Fusion)
 
 This Vagrant file will spin up one control node and multiple worker nodes to use as test environment for Red Hat Certified Engineer exams. Worker nodes receive an optional secondary disk for storage-related exercises.
 

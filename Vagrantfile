@@ -1,7 +1,6 @@
 
 vdiskmanager = '/Applications/VMware\ Fusion.app/Contents/Library/vmware-vdiskmanager'
 vdisk_dir = "#{File.dirname(__FILE__)}/vagrant-additional-disks"
-base_box = "generic/rhel8"
 
 machines=[
   {
@@ -32,7 +31,7 @@ Vagrant.configure("2") do |config|
   # Worker nodes
   machines.each do |machine|
     config.vm.define machine[:hostname] do |node|
-      node.vm.box = base_box
+      node.vm.box = 'almalinux/8'
       node.vm.hostname = machine[:hostname]
       node.vm.network :private_network
       # node4.vm.synced_folder ".", "/vagrant", type: "rsync", rsync__exclude: [".git/", "*.vdi"]
@@ -52,17 +51,21 @@ Vagrant.configure("2") do |config|
           `#{vdiskmanager} -c -s #{machine[:disk]} -a lsilogic -t 1 #{vdisk_path}`
         end
         vm.vmx['scsi0.present'] = 'TRUE'
-        vm.vmx['scsi0:0.present']  = 'TRUE'
-        vm.vmx['scsi0:0.filename'] = vdisk_path
-        vm.vmx['scsi0:0.redo'] = ''
-        vm.vmx['bios.hddOrder'] = "sata0:0"
+        vm.vmx['scsi0:1.present']  = 'TRUE'
+        vm.vmx['scsi0:1.filename'] = vdisk_path
+        vm.vmx['scsi0:1.redo'] = ''
+        # vm.vmx['bios.hddOrder'] = "sata0:0"
       end
+      node.vm.provision "shell", inline: <<-SHELL
+        # Enable firewall (as is default on RHEL)
+        systemctl enable --now firewalld
+    SHELL
     end
   end
 
   # Control Node
   config.vm.define "control" do |control|
-    control.vm.box = base_box
+    control.vm.box = "generic/rhel8"
     control.vm.hostname = "control"
     control.vm.network :private_network
 
