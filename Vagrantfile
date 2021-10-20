@@ -1,20 +1,37 @@
 
 vdiskmanager = '/Applications/VMware\ Fusion.app/Contents/Library/vmware-vdiskmanager'
 vdisk_dir = "#{File.dirname(__FILE__)}/vagrant-additional-disks"
+rhel_flavor = "almalinux/8"  #"generic/rhel8"
 
 machines=[
   {
-    :hostname => "node1",
+    :hostname => "server1.example.com",
     :ram => 512,
     :cpu => 1,
     :disk => "5GB",
   },
   {
-    :hostname => "node2",
+    :hostname => "server2.example.com",
     :ram => 512,
     :cpu => 1,
-    :disk => "10GB"
-  }
+    :disk => "5GB"
+  },
+  {
+    :hostname => "server3.example.com",
+    :ram => 512,
+    :cpu => 1,
+  },
+  {
+    :hostname => "server5.example.com",
+    :ram => 512,
+    :cpu => 1,
+  },
+  # {
+  #   :hostname => "node5.example.com",
+  #   :ram => 512,
+  #   :cpu => 1,
+  #   :disk => "2GB"
+  # },
 ]
 
 Vagrant.configure("2") do |config|
@@ -31,7 +48,7 @@ Vagrant.configure("2") do |config|
   # Worker nodes
   machines.each do |machine|
     config.vm.define machine[:hostname] do |node|
-      node.vm.box = 'almalinux/8'
+      node.vm.box = rhel_flavor
       node.vm.hostname = machine[:hostname]
       node.vm.network :private_network
       # node4.vm.synced_folder ".", "/vagrant", type: "rsync", rsync__exclude: [".git/", "*.vdi"]
@@ -45,16 +62,18 @@ Vagrant.configure("2") do |config|
         vm.vmx["numvcpus"] = machine[:cpu]
         vm.ssh_info_public = true
         
-        vm.linked_clone = false  # To allow adding new HDs
-        vdisk_path = "#{vdisk_dir}/#{machine[:hostname]}.vmdk"
-        unless File.exists?( vdisk_path )
-          `#{vdiskmanager} -c -s #{machine[:disk]} -a lsilogic -t 1 #{vdisk_path}`
+        if machine.has_key? :disk
+          vm.linked_clone = false  # To allow adding new HDs
+          vdisk_path = "#{vdisk_dir}/#{machine[:hostname]}.vmdk"
+          unless File.exists?( vdisk_path )
+            `#{vdiskmanager} -c -s #{machine[:disk]} -a lsilogic -t 1 #{vdisk_path}`
+          end
+          vm.vmx['scsi0.present'] = 'TRUE'
+          vm.vmx['scsi0:1.present']  = 'TRUE'
+          vm.vmx['scsi0:1.filename'] = vdisk_path
+          vm.vmx['scsi0:1.redo'] = ''
+          # vm.vmx['bios.hddOrder'] = "sata0:0"
         end
-        vm.vmx['scsi0.present'] = 'TRUE'
-        vm.vmx['scsi0:1.present']  = 'TRUE'
-        vm.vmx['scsi0:1.filename'] = vdisk_path
-        vm.vmx['scsi0:1.redo'] = ''
-        # vm.vmx['bios.hddOrder'] = "sata0:0"
       end
       node.vm.provision "shell", inline: <<-SHELL
         # Enable firewall (as is default on RHEL)
@@ -65,7 +84,7 @@ Vagrant.configure("2") do |config|
 
   # Control Node
   config.vm.define "control" do |control|
-    control.vm.box = "generic/rhel8"
+    control.vm.box = rhel_flavor
     control.vm.hostname = "control"
     control.vm.network :private_network
 
@@ -75,13 +94,5 @@ Vagrant.configure("2") do |config|
       vm.vmx["numvcpus"] = "1"
       vm.ssh_info_public = true
     end
-
-    control.vm.provision "shell", privileged: false, inline: <<-SHELL
-      # Install insecure default key to reach other nodes
-      umask 077
-      curl -LJ -o $HOME/.ssh/id_rsa https://raw.githubusercontent.com/hashicorp/vagrant/master/keys/vagrant
-    SHELL
   end
-
-  config.vm.provision :hostmanager
 end
